@@ -67,10 +67,11 @@ class Demuxer:
                 message = self.mqtt_queue.popleft()
             except IndexError:
                 message = None
+
             if message != None:
                 client.publish(self.mqtt_config.topic, message)
             else:
-                sleep(1)
+                client.loop(1)
 
         client.disconnect()
 
