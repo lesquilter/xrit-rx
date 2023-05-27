@@ -26,6 +26,7 @@ class Dashboard:
 
         try:
             self.socket = socketserver.TCPServer(("", int(dash_config.port)), Handler)
+            self.socket.allow_reuse_address = True
         except OSError as e:
             if e.errno == 10048:
                 print("\n" + Fore.WHITE + Back.RED + Style.BRIGHT + "DASHBOARD NOT STARTED: PORT ALREADY IN USE")
