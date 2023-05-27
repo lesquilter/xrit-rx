@@ -13,13 +13,15 @@ import sys
 import ccsds as CCSDS
 import products
 
+import paho.mqtt.client as mqtt
+
 
 class Demuxer:
     """
     Coordinates demultiplexing of CCSDS virtual channels into xRIT files.
     """
 
-    def __init__(self, config):
+    def __init__(self, config, mqtt_config=None):
         """
         Initialises demuxer class
         """
@@ -33,6 +35,7 @@ class Demuxer:
         self.currentVCID = None         # Current Virtual Channel ID
         self.lastImage = None           # Last image output by demuxer
         self.lastXRIT = None            # Last xRIT file output by demuxer
+        self.mqtt_config = mqtt_config
 
         if self.config.downlink == "LRIT":
             self.coreWait = 54          # Core loop delay in ms for LRIT (108.8ms per packet @ 64 kbps)
@@ -44,6 +47,32 @@ class Demuxer:
         demux_thread.name = "DEMUX CORE"
         demux_thread.run = self.demux_core
         demux_thread.start()
+
+        if (None != mqtt_config):
+            self.mqtt_queue = deque()
+            mqtt_thread = Thread()
+            mqtt_thread.run = self.mqtt_notify
+            mqtt_thread.start()
+
+    def mqtt_notify(self):
+        """
+        Read the mqtt_queue and send mqtt messages
+        """
+
+        client = mqtt.Client()
+        client.connect(self.mqtt_config.host, self.mqtt_config.port, 60)
+
+        while not self.coreStop:
+            try:
+                message = self.mqtt_queue.popleft()
+            except IndexError:
+                message = None
+            if message != None:
+                client.publish(self.mqtt_config.topic, message)
+            else:
+                sleep(1)
+
+        client.disconnect()
 
     def demux_core(self):
         """
@@ -373,7 +402,6 @@ class Channel:
             diff = ex - ac
             print("    [TP_File]  CURRENT LEN: {} ({}%)     EXPECTED LEN: {}     DIFF: {}\n\n\n".format(ac, p, ex, diff))
 
-
     def handle_xRIT(self, spdu):
         """
         Processes complete S_PDUs to build xRIT and Image files
@@ -401,6 +429,12 @@ class Channel:
             if self.cProduct.complete:
                 self.cProduct.save()
                 self.demuxer.lastImage = self.cProduct.last
+
+                # send mqtt notification
+                path = self.cProduct.get_save_path(self.cProduct.get_ext())
+                path = "/".join(path.split("/")[-4:])
+                self.demuxer.mqtt_queue.append(path)
+
                 self.cProduct = None
         else:
             # Print XRIT file info

@@ -155,6 +155,9 @@ class MultiSegmentImage(Product):
         self.ext = "jpg"                    # Output file extension
         self.lastproglen = 0                # Last number of lines in progress indicator
 
+    def get_ext(self):
+        return self.ext
+
     def add(self, xrit):
         """
         Add data to product
@@ -389,6 +392,9 @@ class AlphanumericText(Product):
         # Product specific setup
         self.payload = None
         self.ext = "txt"
+
+    def get_ext(self):
+        return self.ext
 
     def add(self, xrit):
         """

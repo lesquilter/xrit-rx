@@ -41,6 +41,9 @@ dash = None             # Dashboard class object
 dashe = None            # Dashboard enabled flag
 dashp = None            # Dashboard HTTP port
 dashi = None            # Dashboard refresh interval (sec)
+mqtt_host = None
+mqtt_port = None
+mqtt_topic = None
 ver = "1.3.1"           # xrit-rx version
 
 
@@ -77,6 +80,13 @@ def init():
     # Create demuxer instance
     demux_config = namedtuple('demux_config', 'spacecraft downlink verbose dump output images xrit blacklist keys')
     output += "/" + downlink + "/"
+
+    if (mqtt_host != None):
+        mqtt_config_tuple = namedtuple("mqtt_config", "host port topic")
+        mqtt_config = mqtt_config_tuple(mqtt_host, mqtt_port, mqtt_topic)
+    else:
+        mqtt_config = None
+
     demux = Demuxer(
         demux_config(
             spacecraft,
@@ -88,7 +98,8 @@ def init():
             output_xrit,
             blacklist,
             keys
-        )
+        ),
+        mqtt_config
     )
 
     # Start dashboard server
@@ -393,6 +404,9 @@ def parse_config(path):
     global dashe
     global dashp
     global dashi
+    global mqtt_host
+    global mqtt_port
+    global mqtt_topic
 
     cfgp = ConfigParser()
     cfgp.read(path)
@@ -427,6 +441,16 @@ def parse_config(path):
 
         # If parsed into int, wrap int in list
         if type(blacklist) == int: blacklist = [blacklist]
+
+    try:
+        mqtt_host = cfgp.get('mqtt', 'host').lower()
+        mqtt_port = int(cfgp.get('mqtt', 'port'))
+        mqtt_topic = cfgp.get('mqtt', 'topic').lower()
+    except NoSectionError as e:
+        pass
+    except NoOptionError as e:
+        print("MQTT configuration error: " + str(e).upper())
+        safe_stop()
 
     return cfgp
 
